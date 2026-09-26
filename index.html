@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex Legends RP Calculator & Heatmap</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- D3.js v7 via reliable CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <!-- Google Fonts: Inter & Rajdhani -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            apex: ['Rajdhani', 'sans-serif'],
+          },
+          colors: {
+            apex: {
+              red: '#da292a',
+              crimson: '#9b1819',
+              darkBg: '#0b0c10',
+              panel: '#12141c',
+              card: '#181b26',
+              border: '#272c3d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0b0d13;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(218, 41, 42, 0.07) 0%, transparent 45%),
+        radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 45%),
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #202636;
+      border-radius: 9999px;
+      height: 7px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #da292a;
+      cursor: pointer;
+      border: 2.5px solid #ffffff;
+      box-shadow: 0 0 10px rgba(218, 41, 42, 0.7);
+      transition: transform 0.12s ease, background-color 0.12s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #ff3c3d;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #da292a;
+      cursor: pointer;
+      border: 2.5px solid #ffffff;
+      box-shadow: 0 0 10px rgba(218, 41, 42, 0.7);
+    }
+
+    .cell-rect {
+      transition: stroke 0.15s, stroke-width 0.15s, opacity 0.15s;
+      cursor: pointer;
+    }
+    .cell-rect:hover {
+      stroke: #ffffff !important;
+      stroke-width: 2px !important;
+      opacity: 1 !important;
+    }
+    .cell-selected {
+      stroke: #facc15 !important;
+      stroke-width: 3px !important;
+      filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.8));
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f121a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #272d40;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #da292a;
+    }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col font-sans selection:bg-red-600 selection:text-white">
+
+  <header class="border-b border-apex-border bg-apex-panel/90 backdrop-blur-md sticky top-0 z-40 px-4 lg:px-8 py-3.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-gradient-to-tr from-apex-red to-red-500 rounded-lg flex items-center justify-center shadow-lg shadow-red-950/60 border border-red-400/30">
+          <svg class="w-6 h-6 text-white transform -rotate-12" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2L1 21h22L12 2zm0 4.5l6.5 11.5h-13L12 6.5z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="font-apex text-2xl font-bold tracking-wider uppercase text-white flex items-center gap-2">
+            Apex Ranked <span class="text-xs bg-red-600/30 text-red-400 border border-red-500/40 px-2 py-0.5 rounded font-sans tracking-normal font-semibold">RP CALCULATOR</span>
+          </h1>
+          <p class="text-xs text-slate-400">Soft-Cap KP Rules &bull; Team Participation &bull; Top-5 Streak Multiplier</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold uppercase tracking-widest text-slate-400 hidden sm:inline">Active Rank:</span>
+        <div id="active-rank-pill" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 text-sm font-semibold text-white">
+          <span id="header-badge" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+          <span id="header-rank-name">Gold</span>
+          <span id="header-entry-cost" class="text-xs font-mono text-red-400">(-38 RP)</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto w-full p-4 lg:p-6 space-y-6 flex-1">
+    <section class="bg-apex-panel/85 rounded-2xl p-4 sm:p-5 border border-apex-border shadow-xl backdrop-blur-sm">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path>
+          </svg>
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">Current Rank Tier (Entry Cost)</h2>
+        </div>
+        <span class="text-xs text-slate-400 font-mono">Deducted prior to drop</span>
+      </div>
+
+      <div id="ranks-grid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+        <!-- Injected via JavaScript -->
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <!-- Controls column -->
+      <div class="lg:col-span-4 bg-apex-panel/90 rounded-2xl p-5 border border-apex-border flex flex-col justify-between shadow-xl space-y-5">
+        <div>
+          <div class="flex items-center justify-between border-b border-apex-border pb-3 mb-4">
+            <h3 class="font-apex text-xl font-bold tracking-wide uppercase text-white flex items-center gap-2">
+              <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              Match Settings
+            </h3>
+            <button id="reset-sliders-btn" class="text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded transition border border-slate-700">Reset</button>
+          </div>
+
+          <!-- Placement Slider -->
+          <div class="space-y-2 mb-5">
+            <div class="flex justify-between items-center">
+              <label class="text-xs uppercase font-bold tracking-wider text-slate-300">Match Placement</label>
+              <div class="flex items-center gap-1.5 font-mono">
+                <span id="placement-val-badge" class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold text-sm border border-blue-500/30">#5</span>
+                <span id="placement-tier-name" class="text-xs text-slate-400">(5th Place)</span>
+              </div>
+            </div>
+            <input id="placement-slider" type="range" min="1" max="20" step="1" value="5" class="w-full">
+            <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+              <span>1st (Champion)</span>
+              <span>10th</span>
+              <span>20th</span>
+            </div>
+          </div>
+
+          <!-- Direct KP Slider -->
+          <div class="space-y-2 mb-5">
+            <div class="flex justify-between items-center">
+              <label class="text-xs uppercase font-bold tracking-wider text-slate-300">Direct KP (Kills + Assists)</label>
+              <div class="flex items-center gap-1.5 font-mono">
+                <span id="kills-val-badge" class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-bold text-sm border border-red-500/30">4 KP</span>
+              </div>
+            </div>
+            <input id="kills-slider" type="range" min="0" max="15" step="1" value="4" class="w-full">
+            <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+              <span>0 KP</span>
+              <span class="text-amber-400">8 (Soft-Cap: 13 RP)</span>
+              <span>15+ KP</span>
+            </div>
+          </div>
+
+          <!-- Participation KP Slider -->
+          <div class="space-y-2 mb-5">
+            <div class="flex justify-between items-center">
+              <div>
+                <label class="text-xs uppercase font-bold tracking-wider text-slate-300">Participation KP</label>
+                <span class="block text-[10px] text-slate-400">Squad kills with no direct assist (50% value)</span>
+              </div>
+              <span id="part-val-badge" class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold text-sm border border-purple-500/30 font-mono">2 Part.</span>
+            </div>
+            <input id="part-slider" type="range" min="0" max="10" step="1" value="2" class="w-full">
+            <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+              <span>0</span>
+              <span>5</span>
+              <span>10 KP</span>
+            </div>
+          </div>
+
+          <!-- Top-5 Streak Selector -->
+          <div class="space-y-2">
+            <div class="flex justify-between items-center">
+              <div>
+                <label class="text-xs uppercase font-bold tracking-wider text-slate-300">Top-5 Streak Status</label>
+                <span class="block text-[10px] text-slate-400">Consecutive Top-5 finishes (+10 to +40 RP)</span>
+              </div>
+              <span id="streak-bonus-active-badge" class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">Active</span>
+            </div>
+            <div id="streak-buttons-group" class="grid grid-cols-5 gap-1.5">
+              <!-- Streak options injected by JS -->
+            </div>
+            <p id="streak-status-note" class="text-[11px] text-slate-400 mt-1 italic"></p>
+          </div>
+        </div>
+
+        <div class="bg-apex-card rounded-xl p-4 border border-apex-border space-y-2.5">
+          <div class="text-xs uppercase font-bold tracking-widest text-slate-400 border-b border-slate-800 pb-1.5 flex justify-between items-center">
+            <span>RP Calculation Formula</span>
+            <span class="text-[10px] font-mono text-slate-500">Live Breakdown</span>
+          </div>
+
+          <div class="space-y-1.5 text-xs font-mono">
+            <div class="flex justify-between text-slate-300">
+              <span class="text-slate-400">Entry Cost:</span>
+              <span id="calc-entry" class="text-red-400 font-bold">-38 RP</span>
+            </div>
+            <div class="flex justify-between text-slate-300">
+              <span class="text-slate-400">Placement RP:</span>
+              <span id="calc-placement" class="text-emerald-400 font-bold">+45 RP</span>
+            </div>
+            <div class="flex justify-between text-slate-300">
+              <span id="calc-elim-title" class="text-slate-400">Elimination RP (KP):</span>
+              <span id="calc-elim" class="text-sky-300 font-bold">+64 RP</span>
+            </div>
+            <div id="calc-elim-detail" class="text-[10px] text-slate-400 text-right pl-4">
+              4 @ 16 RP each
+            </div>
+            <div class="flex justify-between text-slate-300">
+              <span id="calc-part-title" class="text-slate-400">Participation RP:</span>
+              <span id="calc-part" class="text-purple-300 font-bold">+16 RP</span>
+            </div>
+            <div class="flex justify-between text-slate-300">
+              <span class="text-slate-400">Top-5 Streak Bonus:</span>
+              <span id="calc-streak" class="text-amber-400 font-bold">+0 RP</span>
+            </div>
+          </div>
+
+          <div class="pt-2.5 border-t border-slate-800 flex items-center justify-between">
+            <span class="text-sm font-bold uppercase tracking-wider text-slate-200 font-apex">Net RP Outcome:</span>
+            <div id="net-rp-pill" class="text-2xl font-apex font-extrabold px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg">
+              +71 RP
+            </div>
+          </div>
+          <div id="status-message" class="text-xs text-center py-0.5 text-emerald-400/90 font-medium">
+            Positive gain match!
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-8 bg-apex-panel/90 rounded-2xl p-5 border border-apex-border shadow-xl flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-apex-border pb-3 mb-2">
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="font-apex text-xl font-bold tracking-wide uppercase text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                RP Heatmap Matrix
+              </h3>
+              <!-- Selection Status & Deselect Button -->
+              <div id="selection-status-container" class="flex items-center gap-1.5 ml-1">
+                <span id="heatmap-selection-badge" class="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">5th Place • 4 KP</span>
+                <button id="deselect-cell-btn" title="Deselect active cell (Esc)" class="text-xs bg-slate-800 hover:bg-rose-950/80 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 px-2.5 py-0.5 rounded transition flex items-center gap-1">
+                  <span>✕ Deselect</span>
+                </button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Live Net RP matrix. Click a cell to inspect/pin; click it again, click outside, press <kbd class="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-300">Esc</kbd>, or tap Deselect to clear.
+            </p>
+          </div>
+
+          <!-- Color legend -->
+          <div class="flex items-center gap-2 text-xs font-mono">
+            <span class="text-red-400">Deficit</span>
+            <div class="w-24 h-3 rounded-full bg-gradient-to-r from-red-600 via-slate-700 to-emerald-500 border border-slate-600"></div>
+            <span class="text-emerald-400">Profit</span>
+          </div>
+        </div>
+
+        <!-- D3 Visual Container -->
+        <div id="heatmap-wrapper" class="relative flex-1 w-full overflow-x-auto min-h-[440px] select-none">
+          <div id="heatmap-container" class="w-full h-full flex items-center justify-center"></div>
+          <!-- Dynamic Tooltip / Popover with interactive buttons -->
+          <div id="d3-tooltip" class="absolute hidden bg-slate-950/95 border border-slate-700 text-white rounded-lg shadow-2xl p-3 text-xs z-30 backdrop-blur-md max-w-xs transition-opacity duration-150"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-apex-panel/85 rounded-2xl p-5 border border-apex-border shadow-xl">
+      <div class="flex items-center justify-between mb-4 border-b border-apex-border pb-3">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <h3 class="font-apex text-lg font-bold tracking-wide uppercase text-white">Official Ranked Placement & KP Scaling Matrix</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded">KP Soft-Cap: 13 RP after 8 Kills</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-300 font-sans">
+          <thead class="text-xs uppercase bg-apex-card text-slate-400 border-b border-apex-border font-apex tracking-wider">
+            <tr>
+              <th scope="col" class="py-3 px-4">Placement</th>
+              <th scope="col" class="py-3 px-4 text-center">Base Placement RP</th>
+              <th scope="col" class="py-3 px-4 text-center">Direct KP (1–8)</th>
+              <th scope="col" class="py-3 px-4 text-center">Direct KP (9+)</th>
+              <th scope="col" class="py-3 px-4 text-center">Participation KP</th>
+              <th scope="col" class="py-3 px-4 text-center">Net RP at 0 KP (<span id="table-rank-name">Gold</span>)</th>
+              <th scope="col" class="py-3 px-4 text-center">KP to Break Even (No Streak)</th>
+            </tr>
+          </thead>
+          <tbody id="reference-table-body" class="divide-y divide-apex-border/60">
+            <!-- Populated via Javascript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-apex-border py-4 px-6 text-center text-xs text-slate-500 bg-apex-panel/40">
+    Apex Legends RP Visualizer &bull; Built with D3.js & Tailwind CSS &bull; Soft-Cap (13 RP) &bull; Participation (50%) &bull; Top-5 Streak Dynamics.
+  </footer>
+
+  <script>
+    // Rank costs according to standard Apex Ranked entry fees
+    const RANKS = [
+      { id: 'rookie', name: 'Rookie', cost: 0, color: '#10b981' },
+      { id: 'bronze', name: 'Bronze', cost: 10, color: '#c97a44' },
+      { id: 'silver', name: 'Silver', cost: 20, color: '#94a3b8' },
+      { id: 'gold', name: 'Gold', cost: 38, color: '#fbbf24' },
+      { id: 'platinum', name: 'Platinum', cost: 48, color: '#38bdf8' },
+      { id: 'diamond', name: 'Diamond', cost: 65, color: '#60a5fa' },
+      { id: 'master', name: 'Master', cost: 90, color: '#c084fc' },
+      { id: 'predator', name: 'Apex Predator', cost: 90, color: '#f87171' }
+    ];
+
+    // Official Placement table rules with placement RP and initial kill values
+    const PLACEMENT_TIERS = [
+      { id: '1st', label: '1st', min: 1, max: 1, baseRP: 125, killValue: 26 },
+      { id: '2nd', label: '2nd', min: 2, max: 2, baseRP: 95, killValue: 22 },
+      { id: '3rd', label: '3rd', min: 3, max: 3, baseRP: 70, killValue: 18 },
+      { id: '4th', label: '4th', min: 4, max: 4, baseRP: 55, killValue: 16 },
+      { id: '5th', label: '5th', min: 5, max: 5, baseRP: 45, killValue: 16 },
+      { id: '6th', label: '6th', min: 6, max: 6, baseRP: 30, killValue: 16 },
+      { id: '7-9', label: '7th–9th', min: 7, max: 9, baseRP: 20, killValue: 14 },
+      { id: '10-12', label: '10th–12th', min: 10, max: 12, baseRP: 10, killValue: 12 },
+      { id: '13-15', label: '13th–15th', min: 13, max: 15, baseRP: 5, killValue: 10 },
+      { id: '16-20', label: '16th–20th', min: 16, max: 20, baseRP: 0, killValue: 10 },
+    ];
+
+    // Top 5 Streak options: 0/1/2/3/4/5+ with bonus values
+    const STREAK_OPTIONS = [
+      { streak: 0, label: '0 (None)', bonus: 0 },
+      { streak: 1, label: '1 Game', bonus: 0 },
+      { streak: 2, label: '2 Streak', bonus: 10 },
+      { streak: 3, label: '3 Streak', bonus: 20 },
+      { streak: 4, label: '4 Streak', bonus: 30 },
+      { streak: 5, label: '5+ Streak', bonus: 40 }
+    ];
+
+    // Global Application State
+    let state = {
+      rank: RANKS.find(r => r.id === 'gold'),
+      placement: 5,
+      kills: 4,
+      participation: 2,
+      streakSetting: 0,
+      selectedCell: { kills: 4, tierId: '5th' },
+      isPinned: false
+    };
+
+    function getTierForPlacement(place) {
+      return PLACEMENT_TIERS.find(t => place >= t.min && place <= t.max) || PLACEMENT_TIERS[PLACEMENT_TIERS.length - 1];
+    }
+
+    function calculateRP(rankCost, place, directKP, partKP, streakVal) {
+      const tier = getTierForPlacement(place);
+      const placementRP = tier.baseRP;
+
+      // Direct Elimination KP with 8-kill soft cap
+      const baseKillVal = tier.killValue;
+      let elimRP = 0;
+      let regularKills = 0;
+      let softCapKills = 0;
+
+      if (directKP <= 8) {
+        elimRP = directKP * baseKillVal;
+        regularKills = directKP;
+        softCapKills = 0;
+      } else {
+        regularKills = 8;
+        softCapKills = directKP - 8;
+        elimRP = (8 * baseKillVal) + (softCapKills * 13);
+      }
+
+      // Participation KP (50% of placement kill value, rounded down)
+      const partUnitVal = Math.floor(baseKillVal / 2);
+      const partRP = partKP * partUnitVal;
+
+      // Streak Bonus: Only valid if placement is 1st - 5th
+      const isTop5 = place <= 5;
+      let streakRP = 0;
+      const streakDef = STREAK_OPTIONS.find(s => s.streak === streakVal) || STREAK_OPTIONS[0];
+
+      if (isTop5) {
+        streakRP = streakDef.bonus;
+      } else {
+        streakRP = 0;
+      }
+
+      const totalGain = placementRP + elimRP + partRP + streakRP;
+      const netRP = totalGain - rankCost;
+
+      return {
+        placementRP,
+        elimRP,
+        regularKills,
+        softCapKills,
+        baseKillVal,
+        partUnitVal,
+        partRP,
+        streakRP,
+        streakDef,
+        isTop5,
+        entryCost: rankCost,
+        netRP,
+        tier
+      };
+    }
+
+    function deselectCell() {
+      state.selectedCell = null;
+      state.isPinned = false;
+      hideTooltip(true);
+      updateSelectionBadge();
+      renderHeatmap();
+    }
+
+    function updateSelectionBadge() {
+      const container = document.getElementById('selection-status-container');
+      const badge = document.getElementById('heatmap-selection-badge');
+      if (!container || !badge) return;
+
+      if (state.selectedCell) {
+        const tier = PLACEMENT_TIERS.find(t => t.id === state.selectedCell.tierId);
+        badge.innerText = `${tier ? tier.label : state.selectedCell.tierId} • ${state.selectedCell.kills} KP`;
+        container.style.display = 'flex';
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    function hideTooltip(force = false) {
+      if (typeof d3 === 'undefined') return;
+      const tooltip = d3.select('#d3-tooltip');
+      if (force || !state.isPinned) {
+        tooltip.style('opacity', 0);
+        tooltip.classed('hidden', true);
+      }
+    }
+
+    function showTooltip(d, event, isPinned = false) {
+      if (typeof d3 === 'undefined') return;
+      const tooltip = d3.select('#d3-tooltip');
+      tooltip.classed('hidden', false);
+      tooltip.style('opacity', 1);
+
+      const sign = d.calc.netRP > 0 ? '+' : '';
+      const statusColor = d.calc.netRP > 0 ? 'text-emerald-400' : (d.calc.netRP === 0 ? 'text-slate-300' : 'text-red-400');
+      
+      let elimDesc = `${d.kills} @ ${d.tier.killValue} RP`;
+      if (d.kills > 8) {
+        elimDesc = `8 @ ${d.tier.killValue} RP + ${d.kills - 8} @ 13 RP (Soft-Cap)`;
+      }
+
+      tooltip.html(`
+        <div class="font-apex font-bold text-sm text-white mb-1.5 border-b border-slate-700 pb-1 flex justify-between items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full ${isPinned ? 'bg-amber-400 animate-pulse' : 'bg-blue-400'}"></span>
+            <span>${d.tier.label} • ${d.kills} KP</span>
+          </div>
+          <button id="close-popover-btn" class="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 text-sm leading-none" title="Close / Deselect">✕</button>
+        </div>
+        <div class="space-y-1 font-mono text-[11px] text-slate-300">
+          <div class="flex justify-between"><span>Base Placement:</span> <span class="text-white font-bold">+${d.calc.placementRP}</span></div>
+          <div class="flex justify-between"><span>Direct KP:</span> <span class="text-white font-bold">+${d.calc.elimRP}</span></div>
+          <div class="text-[9px] text-slate-400 text-right">${elimDesc}</div>
+          <div class="flex justify-between"><span>Part. KP (${state.participation} × ${d.calc.partUnitVal}):</span> <span class="text-purple-300 font-bold">+${d.calc.partRP}</span></div>
+          <div class="flex justify-between"><span>Top-5 Streak:</span> <span class="${d.calc.isTop5 ? 'text-amber-400' : 'text-slate-500'} font-bold">+${d.calc.streakRP}</span></div>
+          <div class="flex justify-between"><span>Entry Fee:</span> <span class="text-red-400 font-bold">-${state.rank.cost}</span></div>
+          <div class="flex justify-between pt-1.5 border-t border-slate-800 text-xs font-bold ${statusColor}">
+            <span>Net Outcome:</span> <span>${sign}${d.calc.netRP} RP</span>
+          </div>
+        </div>
+        <div class="pt-2 mt-1 border-t border-slate-800 flex gap-1.5">
+          ${isPinned 
+            ? `<button id="deselect-popover-action" class="w-full py-1 text-center font-semibold text-[11px] bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded transition">Deselect Cell</button>` 
+            : `<div class="text-[10px] text-slate-400 italic text-center w-full">Click cell to pin or deselect</div>`
+          }
+        </div>
+      `);
+
+      const closeBtn = document.getElementById('close-popover-btn');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deselectCell();
+        });
+      }
+
+      const deselectActionBtn = document.getElementById('deselect-popover-action');
+      if (deselectActionBtn) {
+        deselectActionBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deselectCell();
+        });
+      }
+
+      const wrapper = document.getElementById('heatmap-wrapper');
+      if (wrapper) {
+        const containerRect = wrapper.getBoundingClientRect();
+        let left = (event.clientX || 0) - containerRect.left + 15;
+        let top = (event.clientY || 0) - containerRect.top - 20;
+
+        if (left + 230 > containerRect.width) {
+          left -= 255;
+        }
+        if (top < 10) top = 10;
+
+        tooltip
+          .style('left', Math.max(10, left) + 'px')
+          .style('top', Math.max(10, top) + 'px');
+      }
+    }
+
+    function initRankButtons() {
+      const container = document.getElementById('ranks-grid');
+      if (!container) return;
+      container.innerHTML = '';
+
+      RANKS.forEach(r => {
+        const isSelected = r.id === state.rank.id;
+        const btn = document.createElement('button');
+        btn.className = `flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition duration-150 relative overflow-hidden group ${
+          isSelected 
+            ? 'bg-apex-card ring-2 ring-opacity-80' 
+            : 'bg-apex-card/60 hover:bg-apex-card border-apex-border hover:border-slate-500'
+        }`;
+        btn.style.borderColor = isSelected ? r.color : '';
+        if (isSelected) {
+          btn.style.boxShadow = `0 0 14px ${r.color}33`;
+        }
+
+        btn.innerHTML = `
+          <div class="text-xs font-apex uppercase font-bold tracking-wider mb-1" style="color: ${r.color}">
+            ${r.name}
+          </div>
+          <div class="text-base font-mono font-black ${isSelected ? 'text-white' : 'text-slate-200'}">
+            -${r.cost}
+          </div>
+          <div class="text-[9px] text-slate-500 uppercase tracking-tight">Entry Cost</div>
+        `;
+
+        btn.addEventListener('click', () => {
+          state.rank = r;
+          updateAllUI();
+        });
+
+        container.appendChild(btn);
+      });
+    }
+
+    function initStreakButtons() {
+      const container = document.getElementById('streak-buttons-group');
+      if (!container) return;
+      container.innerHTML = '';
+
+      STREAK_OPTIONS.forEach(s => {
+        const isSelected = state.streakSetting === s.streak;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `py-1.5 px-2 rounded-lg text-xs font-mono font-bold border transition ${
+          isSelected 
+            ? 'bg-amber-500/20 text-amber-300 border-amber-500 ring-1 ring-amber-500/50' 
+            : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700'
+        }`;
+        btn.innerHTML = `
+          <div>${s.label}</div>
+          <div class="text-[10px] ${s.bonus > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}">+${s.bonus} RP</div>
+        `;
+
+        btn.addEventListener('click', () => {
+          state.streakSetting = s.streak;
+          updateAllUI();
+        });
+
+        container.appendChild(btn);
+      });
+    }
+
+    function updateUIElements() {
+      // Header pill
+      const headerRank = document.getElementById('header-rank-name');
+      if (headerRank) headerRank.innerText = state.rank.name;
+      const headerBadge = document.getElementById('header-badge');
+      if (headerBadge) headerBadge.style.backgroundColor = state.rank.color;
+      const headerCost = document.getElementById('header-entry-cost');
+      if (headerCost) headerCost.innerText = `(-${state.rank.cost} RP)`;
+
+      // Sliders values
+      const pSlider = document.getElementById('placement-slider');
+      if (pSlider) pSlider.value = state.placement;
+      const kSlider = document.getElementById('kills-slider');
+      if (kSlider) kSlider.value = state.kills;
+      const partSlider = document.getElementById('part-slider');
+      if (partSlider) partSlider.value = state.participation;
+
+      // Badges
+      const pBadge = document.getElementById('placement-val-badge');
+      if (pBadge) pBadge.innerText = `#${state.placement}`;
+      const tier = getTierForPlacement(state.placement);
+      const pTierName = document.getElementById('placement-tier-name');
+      if (pTierName) pTierName.innerText = `(${tier.label})`;
+      const kBadge = document.getElementById('kills-val-badge');
+      if (kBadge) kBadge.innerText = `${state.kills} KP`;
+      const partBadge = document.getElementById('part-val-badge');
+      if (partBadge) partBadge.innerText = `${state.participation} Part.`;
+
+      // Calculate outcome
+      const res = calculateRP(state.rank.cost, state.placement, state.kills, state.participation, state.streakSetting);
+
+      // Streak status alert badge & description
+      const streakBadge = document.getElementById('streak-bonus-active-badge');
+      const streakNote = document.getElementById('streak-status-note');
+      
+      if (streakBadge && streakNote) {
+        if (res.isTop5) {
+          streakBadge.className = 'text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+          streakBadge.innerText = `Active (+${res.streakRP} RP)`;
+          streakNote.className = 'text-[11px] text-emerald-400/90 mt-1';
+          streakNote.innerText = res.streakDef.bonus > 0 
+            ? `Top 5 secured! Full streak bonus of +${res.streakRP} RP applied.`
+            : `Top 5 secured! Increase your streak length for up to +40 RP.`;
+        } else {
+          streakBadge.className = 'text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30';
+          streakBadge.innerText = 'Inactive (6th-20th)';
+          streakNote.className = 'text-[11px] text-rose-400/80 mt-1';
+          streakNote.innerText = `Match placed outside Top 5 (#${state.placement}). Streak bonus is 0 RP and resets.`;
+        }
+      }
+
+      // Calculations breakdown
+      const cEntry = document.getElementById('calc-entry');
+      if (cEntry) cEntry.innerText = `-${res.entryCost} RP`;
+      const cPlacement = document.getElementById('calc-placement');
+      if (cPlacement) cPlacement.innerText = `+${res.placementRP} RP`;
+
+      const cElim = document.getElementById('calc-elim');
+      if (cElim) cElim.innerText = `+${res.elimRP} RP`;
+      const elimDetailEl = document.getElementById('calc-elim-detail');
+      if (elimDetailEl) {
+        if (state.kills <= 8) {
+          elimDetailEl.innerText = `${state.kills} @ ${tier.killValue} RP each`;
+        } else {
+          elimDetailEl.innerText = `8 @ ${tier.killValue} RP (${8 * tier.killValue}) + ${state.kills - 8} @ 13 RP soft-cap (${(state.kills - 8) * 13})`;
+        }
+      }
+
+      const cPartTitle = document.getElementById('calc-part-title');
+      if (cPartTitle) cPartTitle.innerText = `Participation (${state.participation} × ${res.partUnitVal} RP):`;
+      const cPart = document.getElementById('calc-part');
+      if (cPart) cPart.innerText = `+${res.partRP} RP`;
+
+      const cStreak = document.getElementById('calc-streak');
+      if (cStreak) cStreak.innerText = res.isTop5 && res.streakRP > 0 ? `+${res.streakRP} RP` : `+0 RP`;
+
+      const netEl = document.getElementById('net-rp-pill');
+      const statusEl = document.getElementById('status-message');
+
+      if (netEl && statusEl) {
+        if (res.netRP > 0) {
+          netEl.innerText = `+${res.netRP} RP`;
+          netEl.className = 'text-2xl font-apex font-extrabold px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg';
+          statusEl.innerText = `Profitable climb! +${res.netRP} RP gained.`;
+          statusEl.className = 'text-xs text-center py-0.5 text-emerald-400/90 font-semibold';
+        } else if (res.netRP === 0) {
+          netEl.innerText = `0 RP`;
+          netEl.className = 'text-2xl font-apex font-extrabold px-3 py-1 rounded-lg bg-slate-500/20 text-slate-300 border border-slate-500/30 shadow-lg';
+          statusEl.innerText = 'Break-even match. No net change.';
+          statusEl.className = 'text-xs text-center py-0.5 text-slate-400 font-semibold';
+        } else {
+          netEl.innerText = `${res.netRP} RP`;
+          netEl.className = 'text-2xl font-apex font-extrabold px-3 py-1 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 shadow-lg';
+          statusEl.innerText = `Point loss: ${Math.abs(res.netRP)} RP deducted.`;
+          statusEl.className = 'text-xs text-center py-0.5 text-red-400/90 font-semibold';
+        }
+      }
+
+      const tRankName = document.getElementById('table-rank-name');
+      if (tRankName) tRankName.innerText = state.rank.name;
+      updateReferenceTable();
+      initStreakButtons();
+    }
+
+    function updateReferenceTable() {
+      const tbody = document.getElementById('reference-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      PLACEMENT_TIERS.forEach(t => {
+        const tr = document.createElement('tr');
+        const isCurrentTier = (state.placement >= t.min && state.placement <= t.max);
+        
+        tr.className = isCurrentTier 
+          ? 'bg-red-500/10 border-l-4 border-l-red-500 transition-colors font-medium' 
+          : 'hover:bg-slate-800/40 transition-colors';
+
+        const zeroKillNet = t.baseRP - state.rank.cost;
+        const zeroKillNetDisplay = zeroKillNet > 0 ? `+${zeroKillNet}` : `${zeroKillNet}`;
+        const zeroColor = zeroKillNet > 0 ? 'text-emerald-400' : (zeroKillNet === 0 ? 'text-slate-300' : 'text-red-400');
+        const partValue = Math.floor(t.killValue / 2);
+
+        const deficit = state.rank.cost - t.baseRP;
+        let killsNeededDisplay = '';
+        if (deficit <= 0) {
+          killsNeededDisplay = '<span class="text-emerald-400 font-semibold">0 (Auto Profit)</span>';
+        } else {
+          const maxNormalKillRP = 8 * t.killValue;
+          if (deficit <= maxNormalKillRP) {
+            const needed = Math.ceil(deficit / t.killValue);
+            killsNeededDisplay = `<span class="text-amber-400 font-bold">${needed} KP</span>`;
+          } else {
+            const remainingDeficit = deficit - maxNormalKillRP;
+            const extraNeeded = Math.ceil(remainingDeficit / 13);
+            const totalNeeded = 8 + extraNeeded;
+            killsNeededDisplay = `<span class="text-amber-400 font-bold">${totalNeeded} KP</span> <span class="text-[10px] text-slate-400 font-mono">(Soft-Cap)</span>`;
+          }
+        }
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 font-apex tracking-wide text-white text-base">
+            ${t.label}
+          </td>
+          <td class="py-2.5 px-4 text-center font-mono text-emerald-400 font-bold">
+            +${t.baseRP}
+          </td>
+          <td class="py-2.5 px-4 text-center font-mono text-sky-300">
+            ${t.killValue} RP
+          </td>
+          <td class="py-2.5 px-4 text-center font-mono text-amber-300 font-semibold">
+            13 RP
+          </td>
+          <td class="py-2.5 px-4 text-center font-mono text-purple-300">
+            ${partValue} RP
+          </td>
+          <td class="py-2.5 px-4 text-center font-mono font-bold ${zeroColor}">
+            ${zeroKillNetDisplay} RP
+          </td>
+          <td class="py-2.5 px-4 text-center font-mono">
+            ${killsNeededDisplay}
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    const maxKills = 15;
+    const yTiersOrdered = [...PLACEMENT_TIERS].reverse();
+
+    function renderHeatmap() {
+      if (typeof d3 === 'undefined') {
+        console.warn('D3.js library not yet ready.');
+        return;
+      }
+
+      const container = document.getElementById('heatmap-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const containerWidth = container.clientWidth || 720;
+      const margin = { top: 28, right: 30, bottom: 50, left: 85 };
+      const width = Math.max(containerWidth, 620) - margin.left - margin.right;
+      const height = 460 - margin.top - margin.bottom;
+
+      const svg = d3.select('#heatmap-container')
+        .append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom);
+
+      // Background rect to capture clicks outside cells for deselecting
+      svg.append('rect')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .attr('fill', 'transparent')
+        .on('click', () => {
+          if (state.selectedCell || state.isPinned) {
+            deselectCell();
+          }
+        });
+
+      // Main translated visualization group
+      const g = svg.append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+      const killValues = d3.range(0, maxKills + 1);
+      const xBandScale = d3.scaleBand()
+        .domain(killValues)
+        .range([0, width])
+        .padding(0.08);
+
+      const tierIds = yTiersOrdered.map(d => d.id);
+      const yBandScale = d3.scaleBand()
+        .domain(tierIds)
+        .range([height, 0])
+        .padding(0.08);
+
+      // Robust Diverging Color scale avoiding identical domain edge cases
+      const minCostDomain = Math.min(-state.rank.cost, -5);
+      const colorScale = d3.scaleDiverging()
+        .domain([minCostDomain, 0, 220])
+        .interpolator(t => {
+          if (t < 0.5) {
+            const factor = t / 0.5;
+            return d3.interpolateRgb('#991b1b', '#1c2438')(factor);
+          } else {
+            const factor = (t - 0.5) / 0.5;
+            return d3.interpolateRgb('#1c2438', '#10b981')(factor);
+          }
+        });
+
+      // Render X-Axis inside g
+      const xAxis = d3.axisBottom(xBandScale)
+        .tickFormat(d => d === 8 ? `${d}★` : (d === maxKills ? `${d}+` : `${d}`));
+
+      g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(xAxis)
+        .call(axis => axis.select('.domain').attr('stroke', '#334155'))
+        .call(axis => axis.selectAll('.tick line').attr('stroke', '#334155'))
+        .call(axis => axis.selectAll('text').attr('fill', '#94a3b8').style('font-family', 'Inter').style('font-size', '11px'));
+
+      // X-Axis Label inside g
+      g.append('text')
+        .attr('x', width / 2)
+        .attr('y', height + 40)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#cbd5e1')
+        .attr('font-size', '12px')
+        .attr('font-weight', '600')
+        .attr('letter-spacing', '0.05em')
+        .text('DIRECT ELIMINATIONS / KP (★ 8 = Soft-Cap)');
+
+      // Render Y-Axis inside g
+      const yAxis = d3.axisLeft(yBandScale)
+        .tickFormat(id => {
+          const t = PLACEMENT_TIERS.find(x => x.id === id);
+          return t ? t.label : id;
+        });
+
+      g.append('g')
+        .call(yAxis)
+        .call(axis => axis.select('.domain').attr('stroke', '#334155'))
+        .call(axis => axis.selectAll('.tick line').attr('stroke', '#334155'))
+        .call(axis => axis.selectAll('text')
+          .attr('fill', '#cbd5e1')
+          .style('font-family', 'Rajdhani')
+          .style('font-size', '13px')
+          .style('font-weight', '700')
+          .attr('dx', '-6px'));
+
+      // Y-Axis Label inside g
+      g.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -height / 2)
+        .attr('y', -65)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#cbd5e1')
+        .attr('font-size', '12px')
+        .attr('font-weight', '600')
+        .attr('letter-spacing', '0.05em')
+        .text('PLACEMENT BRACKET');
+
+      // Generate cell dataset factoring in participation and streak
+      const cellsData = [];
+      yTiersOrdered.forEach(tier => {
+        killValues.forEach(k => {
+          const calc = calculateRP(state.rank.cost, tier.min, k, state.participation, state.streakSetting);
+          cellsData.push({
+            tier,
+            kills: k,
+            calc
+          });
+        });
+      });
+
+      const tooltip = d3.select('#d3-tooltip');
+
+      // Draw Heatmap Rectangles inside g
+      g.selectAll('.cell-rect')
+        .data(cellsData)
+        .enter()
+        .append('rect')
+        .attr('class', 'cell-rect')
+        .attr('x', d => xBandScale(d.kills))
+        .attr('y', d => yBandScale(d.tier.id))
+        .attr('width', xBandScale.bandwidth())
+        .attr('height', yBandScale.bandwidth())
+        .attr('rx', 4)
+        .attr('fill', d => colorScale(d.calc.netRP))
+        .attr('stroke', d => {
+          const isSelected = state.selectedCell && (state.selectedCell.kills === d.kills) && (state.selectedCell.tierId === d.tier.id);
+          return isSelected ? '#facc15' : '#1e293b';
+        })
+        .attr('stroke-width', d => {
+          const isSelected = state.selectedCell && (state.selectedCell.kills === d.kills) && (state.selectedCell.tierId === d.tier.id);
+          return isSelected ? 3 : 1;
+        })
+        .attr('opacity', d => {
+          const isSelected = state.selectedCell && (state.selectedCell.kills === d.kills) && (state.selectedCell.tierId === d.tier.id);
+          return isSelected ? 1 : 0.88;
+        })
+        .classed('cell-selected', d => Boolean(state.selectedCell && (state.selectedCell.kills === d.kills) && (state.selectedCell.tierId === d.tier.id)))
+        .on('mouseover', function(event, d) {
+          d3.select(this).style('opacity', 1);
+          if (!state.isPinned) {
+            showTooltip(d, event, false);
+          }
+        })
+        .on('mousemove', function(event, d) {
+          if (!state.isPinned) {
+            const wrapper = document.getElementById('heatmap-wrapper');
+            if (wrapper) {
+              const containerRect = wrapper.getBoundingClientRect();
+              let left = event.clientX - containerRect.left + 15;
+              let top = event.clientY - containerRect.top - 20;
+
+              if (left + 230 > containerRect.width) {
+                left -= 255;
+              }
+              if (top < 10) top = 10;
+              tooltip
+                .style('left', Math.max(10, left) + 'px')
+                .style('top', Math.max(10, top) + 'px');
+            }
+          }
+        })
+        .on('mouseout', function() {
+          if (!state.isPinned) {
+            hideTooltip(false);
+          }
+        })
+        .on('click', function(event, d) {
+          event.stopPropagation();
+          // Toggle deselect if same cell is clicked
+          if (state.selectedCell && state.selectedCell.kills === d.kills && state.selectedCell.tierId === d.tier.id) {
+            deselectCell();
+          } else {
+            state.selectedCell = { kills: d.kills, tierId: d.tier.id };
+            state.kills = d.kills;
+            state.placement = d.tier.min;
+            state.isPinned = true;
+            updateAllUI();
+            showTooltip(d, event, true);
+          }
+        });
+
+      // Render cell text values inside g
+      g.selectAll('.cell-text')
+        .data(cellsData)
+        .enter()
+        .append('text')
+        .attr('class', 'cell-text pointer-events-none')
+        .attr('x', d => xBandScale(d.kills) + xBandScale.bandwidth() / 2)
+        .attr('y', d => yBandScale(d.tier.id) + yBandScale.bandwidth() / 2 + 4)
+        .attr('text-anchor', 'middle')
+        .attr('fill', d => {
+          if (Math.abs(d.calc.netRP) < 10) return '#ffffff';
+          return d.calc.netRP > 0 ? '#ecfdf5' : '#fee2e2';
+        })
+        .attr('font-size', xBandScale.bandwidth() < 28 ? '9px' : '11px')
+        .attr('font-family', 'Inter')
+        .attr('font-weight', '700')
+        .text(d => {
+          if (xBandScale.bandwidth() < 22 && d.kills % 2 !== 0) return '';
+          return d.calc.netRP > 0 ? `+${d.calc.netRP}` : `${d.calc.netRP}`;
+        });
+
+      // Soft-Cap guide line inside g
+      const softCapX = xBandScale(8) + xBandScale.bandwidth() + (xBandScale.step() - xBandScale.bandwidth()) / 2;
+      g.append('line')
+        .attr('x1', softCapX)
+        .attr('x2', softCapX)
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', '#f59e0b')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '3 3')
+        .attr('opacity', 0.65)
+        .style('pointer-events', 'none');
+
+      g.append('text')
+        .attr('x', softCapX + 4)
+        .attr('y', 12)
+        .attr('fill', '#fbbf24')
+        .attr('font-size', '9px')
+        .attr('font-family', 'Inter')
+        .attr('font-weight', '700')
+        .style('pointer-events', 'none')
+        .text('SOFT-CAP (13 RP)');
+
+      // Break-even contour boundary
+      drawBreakEvenBoundary(g, width, xBandScale, yBandScale);
+    }
+
+    function drawBreakEvenBoundary(targetGroup, width, xBandScale, yBandScale) {
+      const breakPoints = [];
+
+      yTiersOrdered.forEach(tier => {
+        const zeroCalc = calculateRP(state.rank.cost, tier.min, 0, state.participation, state.streakSetting);
+        const totalBase = zeroCalc.placementRP + zeroCalc.partRP + zeroCalc.streakRP;
+        const deficit = state.rank.cost - totalBase;
+
+        let requiredKills = 0;
+        if (deficit <= 0) {
+          requiredKills = 0;
+        } else {
+          const maxNormalKillRP = 8 * tier.killValue;
+          if (deficit <= maxNormalKillRP) {
+            requiredKills = deficit / tier.killValue;
+          } else {
+            const extraNeeded = (deficit - maxNormalKillRP) / 13;
+            requiredKills = 8 + extraNeeded;
+          }
+        }
+
+        if (requiredKills <= maxKills) {
+          const floorKill = Math.min(Math.floor(requiredKills), maxKills);
+          const frac = requiredKills - floorKill;
+          const xPos = xBandScale(floorKill) + frac * xBandScale.step();
+          const yPos = yBandScale(tier.id) + yBandScale.bandwidth() / 2;
+
+          breakPoints.push({ x: xPos, y: yPos, tier: tier.label });
+        }
+      });
+
+      if (breakPoints.length > 1) {
+        const lineGen = d3.line()
+          .x(d => d.x)
+          .y(d => d.y)
+          .curve(d3.curveMonotoneY);
+
+        targetGroup.append('path')
+          .datum(breakPoints)
+          .attr('fill', 'none')
+          .attr('stroke', '#ffffff')
+          .attr('stroke-width', 2.5)
+          .attr('stroke-dasharray', '4 4')
+          .attr('d', lineGen)
+          .attr('filter', 'drop-shadow(0 0 5px rgba(255,255,255,0.8))')
+          .style('pointer-events', 'none');
+
+        const midPt = breakPoints[Math.floor(breakPoints.length / 2)];
+        if (midPt) {
+          targetGroup.append('text')
+            .attr('x', Math.min(width - 70, midPt.x + 8))
+            .attr('y', midPt.y - 8)
+            .attr('fill', '#ffffff')
+            .attr('font-size', '10px')
+            .attr('font-family', 'Inter')
+            .attr('font-weight', '700')
+            .style('pointer-events', 'none')
+            .text('⚡ BREAK-EVEN (0 RP)');
+        }
+      }
+    }
+
+    function updateAllUI() {
+      try {
+        initRankButtons();
+        updateUIElements();
+        updateSelectionBadge();
+        renderHeatmap();
+      } catch (err) {
+        console.error('Error during UI update:', err);
+      }
+    }
+
+    // Attach deselect button handler
+    const deselectBtn = document.getElementById('deselect-cell-btn');
+    if (deselectBtn) {
+      deselectBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deselectCell();
+      });
+    }
+
+    // Keyboard shortcut: Escape key deselects active cell
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        deselectCell();
+      }
+    });
+
+    // Slider inputs
+    const pSlider = document.getElementById('placement-slider');
+    if (pSlider) {
+      pSlider.addEventListener('input', (e) => {
+        state.placement = parseInt(e.target.value, 10);
+        const tier = getTierForPlacement(state.placement);
+        state.selectedCell = { kills: state.kills, tierId: tier.id };
+        updateUIElements();
+        updateSelectionBadge();
+        renderHeatmap();
+      });
+    }
+
+    const kSlider = document.getElementById('kills-slider');
+    if (kSlider) {
+      kSlider.addEventListener('input', (e) => {
+        state.kills = parseInt(e.target.value, 10);
+        const tier = getTierForPlacement(state.placement);
+        state.selectedCell = { kills: state.kills, tierId: tier.id };
+        updateUIElements();
+        updateSelectionBadge();
+        renderHeatmap();
+      });
+    }
+
+    const partSlider = document.getElementById('part-slider');
+    if (partSlider) {
+      partSlider.addEventListener('input', (e) => {
+        state.participation = parseInt(e.target.value, 10);
+        updateUIElements();
+        renderHeatmap();
+      });
+    }
+
+    const resetBtn = document.getElementById('reset-sliders-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        state.placement = 5;
+        state.kills = 4;
+        state.participation = 2;
+        state.streakSetting = 0;
+        state.selectedCell = { kills: 4, tierId: '5th' };
+        state.isPinned = false;
+        hideTooltip(true);
+        updateAllUI();
+      });
+    }
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        renderHeatmap();
+      }, 120);
+    });
+
+    // Immediate and robust initialization across standard and iframe environments
+    function initApp() {
+      initStreakButtons();
+      updateAllUI();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+  </script>
+</body>
+</html>
