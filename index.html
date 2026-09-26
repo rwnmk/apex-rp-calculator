@@ -38,7 +38,7 @@
   <style>
     body {
       background-color: #0b0d13;
-      background-image: 
+      background-image:
         radial-gradient(circle at 10% 20%, rgba(218, 41, 42, 0.07) 0%, transparent 45%),
         radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.05) 0%, transparent 45%),
         linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
@@ -355,7 +355,7 @@
   </main>
 
   <footer class="border-t border-apex-border py-4 px-6 text-center text-xs text-slate-500 bg-apex-panel/40">
-    Apex Legends RP Visualizer &bull; Built with D3.js & Tailwind CSS &bull; Soft-Cap (13 RP) &bull; Participation (50%) &bull; Top-5 Streak Dynamics.
+    Apex Legends RP Visualizer &bull; Built with Gemini (can't beat em, join em), D3.js & Tailwind CSS &bull; Implements soft-cap for kills, participation RP (50%), and top-5 streak gains
   </footer>
 
   <script>
@@ -504,7 +504,7 @@
 
       const sign = d.calc.netRP > 0 ? '+' : '';
       const statusColor = d.calc.netRP > 0 ? 'text-emerald-400' : (d.calc.netRP === 0 ? 'text-slate-300' : 'text-red-400');
-      
+
       let elimDesc = `${d.kills} @ ${d.tier.killValue} RP`;
       if (d.kills > 8) {
         elimDesc = `8 @ ${d.tier.killValue} RP + ${d.kills - 8} @ 13 RP (Soft-Cap)`;
@@ -530,8 +530,8 @@
           </div>
         </div>
         <div class="pt-2 mt-1 border-t border-slate-800 flex gap-1.5">
-          ${isPinned 
-            ? `<button id="deselect-popover-action" class="w-full py-1 text-center font-semibold text-[11px] bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded transition">Deselect Cell</button>` 
+          ${isPinned
+            ? `<button id="deselect-popover-action" class="w-full py-1 text-center font-semibold text-[11px] bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded transition">Deselect Cell</button>`
             : `<div class="text-[10px] text-slate-400 italic text-center w-full">Click cell to pin or deselect</div>`
           }
         </div>
@@ -579,8 +579,8 @@
         const isSelected = r.id === state.rank.id;
         const btn = document.createElement('button');
         btn.className = `flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition duration-150 relative overflow-hidden group ${
-          isSelected 
-            ? 'bg-apex-card ring-2 ring-opacity-80' 
+          isSelected
+            ? 'bg-apex-card ring-2 ring-opacity-80'
             : 'bg-apex-card/60 hover:bg-apex-card border-apex-border hover:border-slate-500'
         }`;
         btn.style.borderColor = isSelected ? r.color : '';
@@ -617,8 +617,8 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = `py-1.5 px-2 rounded-lg text-xs font-mono font-bold border transition ${
-          isSelected 
-            ? 'bg-amber-500/20 text-amber-300 border-amber-500 ring-1 ring-amber-500/50' 
+          isSelected
+            ? 'bg-amber-500/20 text-amber-300 border-amber-500 ring-1 ring-amber-500/50'
             : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white hover:bg-slate-700'
         }`;
         btn.innerHTML = `
@@ -669,13 +669,13 @@
       // Streak status alert badge & description
       const streakBadge = document.getElementById('streak-bonus-active-badge');
       const streakNote = document.getElementById('streak-status-note');
-      
+
       if (streakBadge && streakNote) {
         if (res.isTop5) {
           streakBadge.className = 'text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
           streakBadge.innerText = `Active (+${res.streakRP} RP)`;
           streakNote.className = 'text-[11px] text-emerald-400/90 mt-1';
-          streakNote.innerText = res.streakDef.bonus > 0 
+          streakNote.innerText = res.streakDef.bonus > 0
             ? `Top 5 secured! Full streak bonus of +${res.streakRP} RP applied.`
             : `Top 5 secured! Increase your streak length for up to +40 RP.`;
         } else {
@@ -747,9 +747,9 @@
       PLACEMENT_TIERS.forEach(t => {
         const tr = document.createElement('tr');
         const isCurrentTier = (state.placement >= t.min && state.placement <= t.max);
-        
-        tr.className = isCurrentTier 
-          ? 'bg-red-500/10 border-l-4 border-l-red-500 transition-colors font-medium' 
+
+        tr.className = isCurrentTier
+          ? 'bg-red-500/10 border-l-4 border-l-red-500 transition-colors font-medium'
           : 'hover:bg-slate-800/40 transition-colors';
 
         const zeroKillNet = t.baseRP - state.rank.cost;
